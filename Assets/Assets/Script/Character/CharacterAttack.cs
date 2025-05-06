@@ -6,7 +6,6 @@ public class CharacterAttack : MonoBehaviour
 {
     private bool m_isAttacking = false;
     private Animator m_animator;
-
     private int comboIndex = 0;
     private float lastAttackTime = 0f;
     private bool canReceiveCombo = false;
@@ -15,6 +14,7 @@ public class CharacterAttack : MonoBehaviour
     public float comboResetTime = 1f;
     
     public CharacterConfig characterConfig;
+    public Transform attackPoint;
 
     private void Awake()
     {
@@ -43,13 +43,42 @@ public class CharacterAttack : MonoBehaviour
         if (!canReceiveCombo && comboIndex > 0) return;
 
         comboIndex++;
-        comboIndex = Mathf.Clamp(comboIndex, 1, 3);
+        comboIndex = Mathf.Clamp(comboIndex, 1, 4);
 
         lastAttackTime = Time.time;
         
         m_animator.SetInteger("ComboIndex", comboIndex);
         m_animator.SetTrigger("Attack");
         canReceiveCombo = false;
+    }
+
+    void ApplyDamage()
+    {
+        Collider2D[] hitEnemies = Physics2D.OverlapCircleAll(
+            attackPoint.position,
+            characterConfig.attackRange,
+            characterConfig.enemyLayer);
+
+        foreach (Collider2D enemy in hitEnemies)
+        {
+            IDDamagable target = enemy.GetComponent<IDDamagable>();
+            if (target != null && comboIndex != 4)
+            {
+                target.TakeDamage(characterConfig.baseDamage);
+            }
+            else if (target != null && comboIndex == 4)
+            {
+                target.TakeDamage(characterConfig.heavyAttackDamage);
+            }
+        }
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        if (attackPoint == null) return;
+        
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(attackPoint.position, characterConfig.attackRange);
     }
 
     public void EnableComboWindow()

@@ -7,6 +7,7 @@ public class CharacterMovement : MonoBehaviour
     // Public Section
     public CharacterConfig characterConfig;
     public Transform feetPos;
+    public Transform hitPoint;
     
     // Private Section
     private Rigidbody2D m_rb;
@@ -17,12 +18,22 @@ public class CharacterMovement : MonoBehaviour
     private bool m_isGrounded = true;
     private float m_verticalVelocity = 0f;
 
+    private bool m_isDashing = false;
+    private bool m_canDash = true;
+    private float m_dashTimer = 0f;
+
+    private Vector3 preHitPoint;
+
+    private CharacterAttack _characterAttack;
+
     private void Awake()
     {
         m_rb = GetComponent<Rigidbody2D>();
         m_body = GetComponent<CapsuleCollider2D>();
         m_animator = GetComponent<Animator>();
         m_spriteRenderer = GetComponent<SpriteRenderer>();
+        _characterAttack = GetComponent<CharacterAttack>();
+        preHitPoint = hitPoint.localPosition;
         if (feetPos == null)
         {
             feetPos = transform.Find("Feet");
@@ -33,6 +44,7 @@ public class CharacterMovement : MonoBehaviour
     {
         // Update() function for input update (not relevant with physics)
         JumpInput();
+        Dash();
     }
 
     private void FixedUpdate()
@@ -96,6 +108,7 @@ public class CharacterMovement : MonoBehaviour
 
     void SimulateGravity()
     {
+        if (m_isDashing) return;
         if (!m_isGrounded)
         {
             m_verticalVelocity -= characterConfig.gravityForce * Time.fixedDeltaTime;
@@ -113,10 +126,85 @@ public class CharacterMovement : MonoBehaviour
             m_spriteRenderer.flipX = false;
         else if (MovementInput() < 0)
             m_spriteRenderer.flipX = true;
+        FlipAttackPoint(m_spriteRenderer.flipX);
     }
 
     public void PlayRunAnimation()
     {
         m_animator.SetFloat("Speed", Mathf.Abs(MovementInput()));
+    }
+
+    public void Dash()
+    {
+        if (Input.GetKeyDown(KeyCode.Q) && m_canDash)
+        {
+            StartCoroutine(PerformDash());
+        }
+        if (m_isDashing && Input.GetKeyDown(KeyCode.Space))
+        {
+            CancelDashToJump();
+        }
+        if (m_isDashing && Input.GetKeyDown(KeyCode.E))
+        {
+            CancelDashToAttack();
+        }
+    }
+
+    IEnumerator PerformDash()
+    {
+        m_isDashing = true;
+        m_canDash = false;
+
+        float originalGravity = m_rb.gravityScale;
+        m_rb.gravityScale = 0f;
+
+        Vector2 dashDir = m_spriteRenderer.flipX ? Vector2.left : Vector2.right;
+        Vector2 origin = (Vector2)transform.position;
+
+        float dashLength = characterConfig.dashDistance;
+
+        RaycastHit2D hit = Physics2D.Raycast(origin, dashDir, dashLength,
+            characterConfig.dashObstacleMask);
+        if (hit.collider != null)
+        {
+            dashLength = hit.distance - 0.1f;
+        }
+        Vector2 target = origin + dashDir * dashLength;
+
+        transform.position = target;
+        
+        m_animator.SetTrigger("Dash");
+
+        yield return new WaitForSeconds(characterConfig.dashDuration);
+
+        m_isDashing = false;
+        m_rb.gravityScale = originalGravity;
+        m_rb.linearVelocity = Vector2.zero;
+
+        yield return new WaitForSeconds(characterConfig.dashCooldown);
+        m_canDash = true;
+    }
+
+    void CancelDashToJump()
+    {
+        m_isDashing = false;
+        m_rb.gravityScale = characterConfig.gravityForce;
+        m_verticalVelocity = characterConfig.jumpForce;
+        m_animator.SetBool("Jump", true);
+    }
+
+    void CancelDashToAttack()
+    {
+        m_isDashing = false;
+        m_rb.gravityScale = characterConfig.gravityForce;
+        _characterAttack.PlayAttackAnim();
+    }
+    
+    private void FlipAttackPoint(bool facingLeft)
+    {
+        hitPoint.localPosition = new Vector3(
+            facingLeft ? -Mathf.Abs(preHitPoint.x) : Mathf.Abs(preHitPoint.x),
+            preHitPoint.y,
+            preHitPoint.z);
     }
 }
