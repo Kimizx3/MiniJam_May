@@ -15,8 +15,12 @@ MonoBehaviour:
   enemyName: Basic Samurai
   type: 0
   waitTime: 2
+  detectRadius: 5
   patrolSpeed: 5
   maxHealth: 100
   damage: 5
-  attackRange: 2
+  attackRange: 3
   attackCooldown: 2
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 0

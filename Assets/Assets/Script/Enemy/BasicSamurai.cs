@@ -1,105 +1,192 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using Random = System.Random;
+
+public enum EnemyState
+{
+    Idle,
+    Patrol,
+    Chase,
+    Attack,
+    Hurt,
+    Dead
+}
 
 public class BasicSamurai : BaseEnemy, IDDamagable
 {
-    public EnemyConfig enemyConfig;
-    public Transform pointA;
-    public Transform pointB;
+    // private
+    private EnemyState m_currentState;
+    private GameObject m_currentTarget;
+    private SpriteRenderer m_spriteRenderer;
+    private Rigidbody2D m_rb;
+    private Animator m_animator;
+    private Transform m_preAttackPoint;
+    private float m_lastAttackTime = -999f;
+    
+    // public
+    [Header("Movement")]
     public GameObject playerTarget;
     public Transform attackPoint;
-    public float attackRadius = 0.5f;
-    public LayerMask playerLayer;
+    public GameObject[] pointList;
+
+    [Header("Config")] 
+    public EnemyConfig enemyConfig;
     
-    private int m_currentHealth;
-    private Transform target;
-    private Rigidbody2D m_rb;
-    private SpriteRenderer _spriteRenderer;
-    private Animator m_enemyAnimator;
-    private bool isWaiting = false;
-    private float waitCounter = 0f;
-    private bool isAttacking = false;
-    private bool isChasing = false;
-    private float lastAttackTime = -999f;
-    private Vector3 preAttackPoint;
+    
     private void Awake()
     {
-        m_currentHealth = enemyConfig.maxHealth;
+        m_currentState = EnemyState.Patrol;
+        m_currentTarget = pointList[0];
+        m_spriteRenderer = GetComponent<SpriteRenderer>();
+        m_animator = GetComponent<Animator>();
         m_rb = GetComponent<Rigidbody2D>();
-        _spriteRenderer = GetComponent<SpriteRenderer>();
-        m_enemyAnimator = GetComponent<Animator>();
-        target = pointB;
-        preAttackPoint = attackPoint.localPosition;
+        m_preAttackPoint = attackPoint;
     }
 
     private void Update()
     {
-        Move();
-        Attack();
+        HandleStates();
+    }
+
+    private void HandleStates()
+    {
+        switch (m_currentState)
+        {
+            case EnemyState.Idle:
+                HandleIdle();
+                break;
+            case EnemyState.Patrol:
+                Move();
+                break;
+            case EnemyState.Chase:
+                // HandleIdle()
+                break;
+            case EnemyState.Attack:
+                // HandleIdle()
+                break;
+            case EnemyState.Hurt:
+                // HandleIdle()
+                break;
+            case EnemyState.Dead:
+                // HandleIdle()
+                break;
+            default:
+                break;
+        }
     }
 
     public override void Die()
     {
-        Debug.Log("Enemy die.");
-        //Destroy(gameObject);
+        
+    }
+
+    private void HandleIdle()
+    {
+        m_currentState = EnemyState.Idle;
+        m_rb.linearVelocity = Vector2.Lerp(m_rb.linearVelocity, Vector2.zero, Time.deltaTime * 5f);
+
+        if (m_rb.linearVelocity.magnitude < 0.01f)
+        {
+            m_rb.linearVelocity = Vector2.zero;
+        }
+        
+        m_animator.SetFloat("Speed", 0);
     }
 
     public override void Move()
     {
-        if ( isWaiting || isAttacking) { return; }
+        m_currentState = EnemyState.Patrol;
         
-        Vector2 dir = (target.position - transform.position).normalized;
+        float dir = Mathf.Sign(m_currentTarget.transform.position.x - transform.position.x);
+        
+        // Flip with direction
+        m_spriteRenderer.flipX = dir < 0;
+        
+        // Move Speed
+        m_rb.linearVelocity = new Vector2(dir * enemyConfig.patrolSpeed, m_rb.linearVelocityY);
+        
+        // Handle Move Animation
+        m_animator.SetFloat("Speed", 1);
+        
+        // Flip attack point
+        FlipAttackPoint(m_spriteRenderer.flipX);
+        
+        // Stop within distance
+        bool isInDistance = (Mathf.Abs(transform.position.x - m_currentTarget.transform.position.x) <=
+                            enemyConfig.attackRange);
 
-        if (target == playerTarget.transform)
+        Collider2D hit = Physics2D.OverlapCircle(
+            transform.position, 
+            enemyConfig.detectRadius, 
+            enemyConfig.playerLayer);
+
+        float distanceToPlayer = Mathf.Abs(transform.position.x - playerTarget.transform.position.x);
+        
+        if ( distanceToPlayer <= enemyConfig.detectRadius && hit != null)
         {
-            float distanceToPlayer = Mathf.Abs(transform.position.x - playerTarget.transform.position.x);
-            if (distanceToPlayer <= enemyConfig.attackRange * 0.95f)
-            {
-                m_rb.linearVelocity = new Vector2(0, m_rb.linearVelocityY);
-                m_enemyAnimator.SetFloat("Speed", 0);
-                StartCoroutine(WaitForAttack());
-                return;
-            }
+            Attack();
         }
-        
-        m_rb.linearVelocity = new Vector2(dir.x * enemyConfig.patrolSpeed, m_rb.linearVelocityY);
-        
-        m_enemyAnimator.SetFloat("Speed", Mathf.Abs(m_rb.linearVelocity.x));
-        _spriteRenderer.flipX = dir.x < 0;
-        FlipAttackPoint(_spriteRenderer.flipX);
-
-        if ((dir.x > 0 && transform.position.x >= target.position.x - 0.1f) ||
-            (dir.x < 0 && transform.position.x <= target.position.x + 0.1f))
+        else if ( m_currentState == EnemyState.Patrol && Mathf.Abs(transform.position.x - m_currentTarget.transform.position.x) < 0.5f)
         {
+            m_currentState = EnemyState.Idle;
             StartCoroutine(PatrolPause());
         }
     }
 
-    private void SwitchPatrolPoint()
-    {
-        target = target == pointA ? pointB : pointA;
-    }
-
     IEnumerator PatrolPause()
     {
-        isWaiting = true;
-        m_rb.linearVelocity = Vector2.zero;
-        m_enemyAnimator.SetFloat("Speed", 0);
-
+        HandleIdle();
         yield return new WaitForSeconds(enemyConfig.waitTime);
-        
         SwitchPatrolPoint();
-        isWaiting = false;
+        m_currentState = EnemyState.Patrol;
+    }
+    
+    private void SwitchPatrolPoint()
+    {
+        if (pointList.Length == 1) { return; }
+        int randIndex;
+        do
+        {
+            randIndex = UnityEngine.Random.Range(0, pointList.Length);
+        } while (pointList[randIndex] == m_currentTarget);
+        
+        m_currentTarget = pointList[randIndex];
     }
 
-    private void OnCollisionEnter2D(Collision2D collision)
+    private void FlipAttackPoint(bool facingLeft)
     {
-        IDDamagable damagable = collision.gameObject.GetComponent<IDDamagable>();
-        if (damagable != null)
+        Vector3 preAtk = m_preAttackPoint.position;
+        attackPoint.localPosition = new Vector3(
+            facingLeft ? -Mathf.Abs(preAtk.x) : Mathf.Abs(preAtk.x),
+            preAtk.y,
+            preAtk.z);
+    }
+
+    public override void Attack()
+    {
+        m_currentState = EnemyState.Attack;
+        m_currentTarget = playerTarget;
+        m_rb.linearVelocity = Vector2.zero;
+        float dir = Mathf.Sign(m_currentTarget.transform.position.x - transform.position.x);
+        m_spriteRenderer.flipX = dir < 0;
+        
+        if (Time.time - m_lastAttackTime > enemyConfig.attackCooldown)
         {
-            damagable.TakeDamage(enemyConfig.damage);
+            m_animator.SetTrigger("Attack");
+            m_lastAttackTime = Time.time;
+            StartCoroutine(AttackPause());
         }
+    }
+
+    IEnumerator AttackPause()
+    {
+        yield return new WaitForSeconds(enemyConfig.attackCooldown);
+    }
+
+    private void HandleChase()
+    {
+        
     }
 
     public override void UseAbility()
@@ -109,103 +196,6 @@ public class BasicSamurai : BaseEnemy, IDDamagable
 
     public override void TakeDamage(int damage)
     {
-        m_currentHealth -= damage;
-        Debug.Log("Enemy Took " + damage);
         
-        if (m_currentHealth <= 0)
-        {
-            Die();
-        }
-    }
-
-    public override void Attack()
-    {
-        float distanceToPlayer = Mathf.Abs(transform.position.x - playerTarget.transform.position.x);
-        if (distanceToPlayer <= enemyConfig.attackRange)
-        {
-            isChasing = true;
-            target = playerTarget.transform;
-            if (Time.time - lastAttackTime > enemyConfig.attackCooldown)
-            {
-                m_enemyAnimator.SetTrigger("Attack");
-                lastAttackTime = Time.time;
-                StartCoroutine(AttackPause());
-            }
-        }
-        else
-        {
-            if (isChasing)
-            {
-                target = Mathf.Abs(transform.position.x - pointA.position.x) <
-                         Mathf.Abs(transform.position.x - pointB.position.x)
-                    ? pointA
-                    : pointB;
-                
-                isChasing = false;
-            }
-            
-        }
-    }
-
-    public void DealDamage()
-    {
-        Vector2 toPlayer = (playerTarget.transform.position - transform.position).normalized;
-        float facingDir = _spriteRenderer.flipX ? -1 : 1;
-
-        if (Mathf.Sign(toPlayer.x) != facingDir)
-        {
-            return;
-        }
-
-        Collider2D hit = Physics2D.OverlapCircle(attackPoint.position, attackRadius, playerLayer);
-        
-        float distanceToPlayer = Mathf.Abs(transform.position.x - playerTarget.transform.position.x);
-        if (distanceToPlayer <= enemyConfig.attackRange && hit != null)
-        {
-            IDDamagable player = playerTarget.GetComponent<IDDamagable>();
-            if (player != null)
-            {
-                player.TakeDamage(enemyConfig.damage);
-            }
-        }
-    }
-    
-    IEnumerator AttackPause()
-    {
-        isAttacking = true;
-        isWaiting = true;
-        m_rb.linearVelocity = Vector2.zero;
-        m_enemyAnimator.SetFloat("Speed", 0);
-
-        yield return new WaitForSeconds(enemyConfig.attackCooldown);
-
-        isAttacking = false;
-        isWaiting = false;
-    }
-
-    IEnumerator WaitForAttack()
-    {
-        yield return new WaitForSeconds(2);
-    }
-
-    public void OnAttackEnd()
-    {
-        isAttacking = false;
-    }
-
-    private void FlipAttackPoint(bool facingLeft)
-    {
-        attackPoint.localPosition = new Vector3(
-            facingLeft ? -Mathf.Abs(preAttackPoint.x) : Mathf.Abs(preAttackPoint.x),
-            preAttackPoint.y,
-            preAttackPoint.z);
-    }
-    
-    private void OnDrawGizmosSelected()
-    {
-        if (attackPoint == null) return;
-
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(attackPoint.position, attackRadius);
     }
 }

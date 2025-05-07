@@ -281,7 +281,7 @@ Transform:
   m_GameObject: {fileID: 526029376}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -8.88, y: -1.54, z: 0}
+  m_LocalPosition: {x: -7.27, y: -1.54, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -451,7 +451,7 @@ Transform:
   m_GameObject: {fileID: 1217397041}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 8.73, y: -1.54, z: 0}
+  m_LocalPosition: {x: 7.52, y: -1.54, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -481,15 +481,27 @@ PrefabInstance:
     - target: {fileID: 2023637387498014926, guid: 76d70ea04118e2f45872a553d13d1e98, type: 3}
       propertyPath: pointA
       value: 
-      objectReference: {fileID: 526029377}
+      objectReference: {fileID: 526029376}
     - target: {fileID: 2023637387498014926, guid: 76d70ea04118e2f45872a553d13d1e98, type: 3}
       propertyPath: pointB
       value: 
-      objectReference: {fileID: 1217397042}
+      objectReference: {fileID: 1217397041}
     - target: {fileID: 2023637387498014926, guid: 76d70ea04118e2f45872a553d13d1e98, type: 3}
       propertyPath: playerTarget
       value: 
       objectReference: {fileID: 742258779}
+    - target: {fileID: 2023637387498014926, guid: 76d70ea04118e2f45872a553d13d1e98, type: 3}
+      propertyPath: pointList.Array.size
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 2023637387498014926, guid: 76d70ea04118e2f45872a553d13d1e98, type: 3}
+      propertyPath: 'pointList.Array.data[0]'
+      value: 
+      objectReference: {fileID: 526029376}
+    - target: {fileID: 2023637387498014926, guid: 76d70ea04118e2f45872a553d13d1e98, type: 3}
+      propertyPath: 'pointList.Array.data[1]'
+      value: 
+      objectReference: {fileID: 1217397041}
     - target: {fileID: 7490503008766146688, guid: 76d70ea04118e2f45872a553d13d1e98, type: 3}
       propertyPath: m_LocalPosition.x
       value: 3.13

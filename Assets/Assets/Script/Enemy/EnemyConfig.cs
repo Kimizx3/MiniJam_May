@@ -10,6 +10,7 @@ public class EnemyConfig : ScriptableObject
     public string enemyName;
     public EnemyType type;
     public float waitTime = 1f;
+    public float detectRadius = 5f;
     
     [Header("Movement Setting")] 
     public float patrolSpeed = 20f;
@@ -19,4 +20,5 @@ public class EnemyConfig : ScriptableObject
     public int damage = 5;
     public float attackRange = 1f;
     public float attackCooldown = 1.5f;
+    public LayerMask playerLayer;
 }
